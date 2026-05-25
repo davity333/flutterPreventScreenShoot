@@ -51,21 +51,66 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: Column(
-
-          mainAxisAlignment: MainAxisAlignment.center,
-          //////////////UN HIJO ///////////////////
-          children: [
-            const Text('APLICACION PARA PREVENIR CAPTURAS DE PANTALLA'),
-            const Text(
-              'CAPTURAS DE PANTALLA PREVENIDAS',
-              style: TextStyle(fontSize: 20),
-            ),
-
-          ],
-          ////////////////////////////////
+  child: Padding(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'INICIAR SESIÓN',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
+
+        const SizedBox(height: 30),
+
+        // CAMPO EMAIL
+        TextField(
+          decoration: InputDecoration(
+            labelText: 'Correo electrónico',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // CAMPO PASSWORD
+        TextField(
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: 'Contraseña',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        // BOTÓN LOGIN
+        ElevatedButton(
+          onPressed: () {},
+          child: const Text('Ingresar'),
+        ),
+
+        const SizedBox(height: 15),
+
+        // TEXTO REGISTRO
+        TextButton(
+          onPressed: () {},
+          child: const Text('Crear cuenta'),
+        ),
+      ],
+    ),
+  ),
+),
+
 
     );
   }
