@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_prevent_screenshot/disablescreenshot.dart';
+import 'package:safe_device/safe_device.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -38,16 +41,151 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final _flutterPrevenirCapturar = FlutterPreventScreenshot.instance;
   bool _obscureText = true;
+  bool _isLoading = true;
+  bool _isMockLocationDetected = false;
 
   @override
   void initState() {
     super.initState();
     _flutterPrevenirCapturar.screenshotOff();
+    _verificarSeguridadDispositivo();
+  }
+
+  Future<void> _verificarSeguridadDispositivo() async {
+    try {
+      // Pedimos permiso de ubicación al usuario
+      PermissionStatus status = await Permission.location.request();
+      
+      if (status.isGranted) {
+        bool finalDetection = false;
+        
+        try {
+          // Revisamos rápido la última ubicación en caché 
+          Position? lastKnown = await Geolocator.getLastKnownPosition();
+          if (lastKnown != null && lastKnown.isMocked) {
+            finalDetection = true;
+          }
+        } catch (_) {}
+
+        if (!finalDetection) {
+          try {
+            // Si no está en caché, pedimos la ubicación al instante con baja precisión
+            Position position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.lowest,
+                timeLimit: Duration(seconds: 3),
+              ),
+            );
+            finalDetection = position.isMocked;
+          } catch (_) {}
+        }
+
+        try {
+          // SafeDevice como filtro de respaldo
+          bool isMockLocation = await SafeDevice.isMockLocation;
+          finalDetection = finalDetection || isMockLocation;
+        } catch (_) {}
+        
+        setState(() {
+          _isMockLocationDetected = finalDetection;
+          _isLoading = false;
+        });
+      } else {
+        // Bloqueamos por seguridad si rechaza los permisos
+        setState(() {
+          _isMockLocationDetected = true;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF9C27B0); // Tono morado
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8F9FA),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF9C27B0),
+          ),
+        ),
+      );
+    }
+
+    if (_isMockLocationDetected) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.security_update_warning,
+                  color: Colors.redAccent,
+                  size: 90,
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'Acceso Denegado',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D3142),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'Se ha detectado el uso de ubicaciones simuladas (Fake GPS) o herramientas de alteración de ubicación.\n\nPor seguridad de la aplicación, desinstala estas herramientas o desactiva las "Ubicaciones de prueba" en las opciones de desarrollador de tu teléfono para poder ingresar.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF9094A6),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      SystemNavigator.pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'SALIR DE LA APLICACIÓN',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    const primaryColor = Color(0xFF9C27B0);
     const textColor = Color(0xFF2D3142);
     const subtitleColor = Color(0xFF9094A6);
     const borderColor = Color(0xFFE0E0E0);
