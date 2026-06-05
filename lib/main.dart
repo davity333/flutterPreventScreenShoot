@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:flutter_prevent_screenshot/disablescreenshot.dart';
 import 'package:safe_device/safe_device.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -320,7 +322,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (context) => const SecondPage()),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
@@ -365,6 +371,88 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SecondPage extends StatefulWidget {
+  const SecondPage({super.key});
+
+  @override
+  State<SecondPage> createState() => _SecondPageState();
+}
+
+class _SecondPageState extends State<SecondPage> {
+  Timer? _inactivityTimer;
+  final _storage = const FlutterSecureStorage();
+  final int _timeoutSeconds = 10; // 10 segundos de inactividad para pruebas
+
+  @override
+  void initState() {
+    super.initState();
+    _startInactivityTimer();
+  }
+
+  void _startInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(Duration(seconds: _timeoutSeconds), _handleInactivity);
+  }
+
+  void _handleUserInteraction([_]) {
+    _startInactivityTimer();
+  }
+
+  Future<void> _handleInactivity() async {
+    // Guardar token y tiempo de inactividad en almacenamiento encriptado
+    await _storage.write(key: 'auth_token', value: 'token_seguro_12345');
+    await _storage.write(key: 'inactivity_time', value: DateTime.now().toIso8601String());
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesión cerrada por inactividad')),
+      );
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const MyHomePage()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _inactivityTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: _handleUserInteraction,
+      onPointerMove: _handleUserInteraction,
+      onPointerUp: _handleUserInteraction,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('Inicio'),
+          backgroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () {
+                _inactivityTimer?.cancel();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const MyHomePage()),
+                );
+              },
+            )
+          ],
+        ),
+        body: const Center(
+          child: Text(
+            'bienvenido usuario',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ),
       ),
