@@ -6,8 +6,27 @@ import 'package:safe_device/safe_device.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-void main() {
+// Recibir notificaciones en segundo plano
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  if (message.data['action'] == 'tilines') {
+    const storage = FlutterSecureStorage();
+    await storage.delete(key: 'user_email');
+    await storage.delete(key: 'user_password');
+    await storage.delete(key: 'card_number');
+    await storage.delete(key: 'user_pin');
+  }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -55,14 +74,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _verificarSeguridadDispositivo() async {
     try {
-      // Pedimos permiso de ubicación al usuario
       PermissionStatus status = await Permission.location.request();
-      
       if (status.isGranted) {
         bool finalDetection = false;
-        
         try {
-          // Revisamos rápido la última ubicación en caché 
           Position? lastKnown = await Geolocator.getLastKnownPosition();
           if (lastKnown != null && lastKnown.isMocked) {
             finalDetection = true;
@@ -71,7 +86,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
         if (!finalDetection) {
           try {
-            // Si no está en caché, pedimos la ubicación al instante con baja precisión
             Position position = await Geolocator.getCurrentPosition(
               locationSettings: const LocationSettings(
                 accuracy: LocationAccuracy.lowest,
@@ -83,17 +97,15 @@ class _MyHomePageState extends State<MyHomePage> {
         }
 
         try {
-          // SafeDevice como filtro de respaldo
           bool isMockLocation = await SafeDevice.isMockLocation;
           finalDetection = finalDetection || isMockLocation;
         } catch (_) {}
-        
+
         setState(() {
           _isMockLocationDetected = finalDetection;
           _isLoading = false;
         });
       } else {
-        // Bloqueamos por seguridad si rechaza los permisos
         setState(() {
           _isMockLocationDetected = true;
           _isLoading = false;
@@ -112,9 +124,7 @@ class _MyHomePageState extends State<MyHomePage> {
       return const Scaffold(
         backgroundColor: Color(0xFFF8F9FA),
         body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF9C27B0),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF9C27B0)),
         ),
       );
     }
@@ -129,29 +139,17 @@ class _MyHomePageState extends State<MyHomePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.security_update_warning,
-                  color: Colors.redAccent,
-                  size: 90,
-                ),
+                const Icon(Icons.security_update_warning, color: Colors.redAccent, size: 90),
                 const SizedBox(height: 30),
                 const Text(
                   'Acceso Denegado',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3142),
-                  ),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF2D3142)),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 15),
                 const Text(
-                  'Se ha detectado el uso de ubicaciones simuladas (Fake GPS) o herramientas de alteración de ubicación.\n\nPor seguridad de la aplicación, desinstala estas herramientas o desactiva las "Ubicaciones de prueba" en las opciones de desarrollador de tu teléfono para poder ingresar.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF9094A6),
-                    height: 1.5,
-                  ),
+                  'Se ha detectado el uso de ubicaciones simuladas (Fake GPS).\n\nDesinstala estas herramientas o desactiva las "Ubicaciones de prueba" en las opciones de desarrollador.',
+                  style: TextStyle(fontSize: 15, color: Color(0xFF9094A6), height: 1.5),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 40),
@@ -159,25 +157,15 @@ class _MyHomePageState extends State<MyHomePage> {
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
-                    onPressed: () {
-                      SystemNavigator.pop();
-                    },
+                    onPressed: () => SystemNavigator.pop(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text(
-                      'SALIR DE LA APLICACIÓN',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    child: const Text('SALIR DE LA APLICACIÓN',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -203,42 +191,25 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 const SizedBox(height: 20),
                 Center(
-                  child: Image.asset(
-                    'assets/logo.png',
-                    height: 90,
-                    fit: BoxFit.contain,
-                  ),
+                  child: Image.asset('assets/logo.png', height: 90, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 30),
                 const Center(
                   child: Text(
                     'Bienvenido a Learnex',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: textColor),
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Center(
                   child: Text(
                     'Ingresa tus credenciales para continuar',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: subtitleColor,
-                    ),
+                    style: TextStyle(fontSize: 15, color: subtitleColor),
                   ),
                 ),
                 const SizedBox(height: 40),
-                const Text(
-                  'Email',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
+                const Text('Email',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
                 const SizedBox(height: 8),
                 TextField(
                   keyboardType: TextInputType.emailAddress,
@@ -259,14 +230,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'Contraseña',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
+                const Text('Contraseña',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
                 const SizedBox(height: 8),
                 TextField(
                   obscureText: _obscureText,
@@ -289,11 +254,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         _obscureText ? Icons.visibility_off : Icons.visibility,
                         color: subtitleColor,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureText = !_obscureText;
-                        });
-                      },
+                      onPressed: () => setState(() => _obscureText = !_obscureText),
                     ),
                   ),
                 ),
@@ -309,11 +270,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     child: const Text(
                       '¿Olvidaste tu contraseña?',
-                      style: TextStyle(
-                        color: primaryColor,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -324,48 +281,29 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => const SecondPage()),
+                        MaterialPageRoute(builder: (context) => const SecureDataPage()),
                       );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text(
-                      'INICIAR SESIÓN',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    child: const Text('INICIAR SESIÓN',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                   ),
                 ),
                 const SizedBox(height: 30),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      '¿No tienes cuenta? ',
-                      style: TextStyle(
-                        color: subtitleColor,
-                        fontSize: 14,
-                      ),
-                    ),
+                    const Text('¿No tienes cuenta? ',
+                        style: TextStyle(color: subtitleColor, fontSize: 14)),
                     GestureDetector(
                       onTap: () {},
-                      child: const Text(
-                        'Regístrate',
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text('Regístrate',
+                          style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -378,22 +316,33 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class SecondPage extends StatefulWidget {
-  const SecondPage({super.key});
+// Vista de datos protegidos y borrado remoto
+class SecureDataPage extends StatefulWidget {
+  const SecureDataPage({super.key});
 
   @override
-  State<SecondPage> createState() => _SecondPageState();
+  State<SecureDataPage> createState() => _SecureDataPageState();
 }
 
-class _SecondPageState extends State<SecondPage> {
+class _SecureDataPageState extends State<SecureDataPage> {
   Timer? _inactivityTimer;
   final _storage = const FlutterSecureStorage();
-  final int _timeoutSeconds = 10; // 10 segundos de inactividad para pruebas
+  final int _timeoutSeconds = 30;
+
+  String? _email;
+  String? _password;
+  String? _cardNumber;
+  String? _pin;
+  String? _fcmToken;
+  bool _wiped = false;
+  bool _dataLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _startInactivityTimer();
+    _loadSecureData();
+    _setupFCM();
   }
 
   void _startInactivityTimer() {
@@ -401,15 +350,9 @@ class _SecondPageState extends State<SecondPage> {
     _inactivityTimer = Timer(Duration(seconds: _timeoutSeconds), _handleInactivity);
   }
 
-  void _handleUserInteraction([_]) {
-    _startInactivityTimer();
-  }
+  void _handleUserInteraction([_]) => _startInactivityTimer();
 
   Future<void> _handleInactivity() async {
-    // Guardar token y tiempo de inactividad en almacenamiento encriptado
-    await _storage.write(key: 'auth_token', value: 'token_seguro_12345');
-    await _storage.write(key: 'inactivity_time', value: DateTime.now().toIso8601String());
-    
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sesión cerrada por inactividad')),
@@ -420,6 +363,83 @@ class _SecondPageState extends State<SecondPage> {
     }
   }
 
+  Future<void> _loadSecureData() async {
+    final email = await _storage.read(key: 'user_email');
+    final password = await _storage.read(key: 'user_password');
+    final cardNumber = await _storage.read(key: 'card_number');
+    final pin = await _storage.read(key: 'user_pin');
+    if (mounted) {
+      setState(() {
+        _email = email;
+        _password = password;
+        _cardNumber = cardNumber;
+        _pin = pin;
+        _dataLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _autoFillData() async {
+    await _storage.write(key: 'user_email', value: 'sujey@learnex.com');
+    await _storage.write(key: 'user_password', value: 'Learnex@2025!');
+    await _storage.write(key: 'card_number', value: '4111-1111-1111-1234');
+    await _storage.write(key: 'user_pin', value: '7391');
+    await _loadSecureData();
+    if (mounted) setState(() => _wiped = false);
+  }
+
+  Future<void> _executeWipe() async {
+    await _storage.delete(key: 'user_email');
+    await _storage.delete(key: 'user_password');
+    await _storage.delete(key: 'card_number');
+    await _storage.delete(key: 'user_pin');
+    if (mounted) {
+      setState(() {
+        _email = null;
+        _password = null;
+        _cardNumber = null;
+        _pin = null;
+        _wiped = true;
+      });
+    }
+  }
+
+  Future<void> _setupFCM() async {
+    // Pedir permisos
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // Obtener token para pruebas
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (mounted) setState(() => _fcmToken = token);
+
+    // Escuchar notificaciones (app abierta)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.data['action'] == 'tilines') {
+        _executeWipe();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Wipe remoto ejecutado. Datos eliminados.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 5),
+              ),
+            );
+        }
+      }
+    });
+
+    // Tocar notificación en segundo plano
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      if (message.data['action'] == 'tilines') {
+        _executeWipe();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _inactivityTimer?.cancel();
@@ -428,6 +448,11 @@ class _SecondPageState extends State<SecondPage> {
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF9C27B0);
+    const textColor = Color(0xFF2D3142);
+    const subtitleColor = Color(0xFF9094A6);
+    const borderColor = Color(0xFFE0E0E0);
+
     return Listener(
       onPointerDown: _handleUserInteraction,
       onPointerMove: _handleUserInteraction,
@@ -435,26 +460,242 @@ class _SecondPageState extends State<SecondPage> {
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Inicio'),
           backgroundColor: Colors.white,
+          foregroundColor: textColor,
+          elevation: 0,
+          title: const Text(
+            'Datos Sensibles',
+            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18),
+          ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: const Icon(Icons.logout, color: textColor),
               onPressed: () {
                 _inactivityTimer?.cancel();
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (context) => const MyHomePage()),
                 );
               },
-            )
+            ),
           ],
         ),
-        body: const Center(
-          child: Text(
-            'bienvenido usuario',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        body: !_dataLoaded
+            ? const Center(child: CircularProgressIndicator(color: primaryColor))
+            : SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_wiped) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFEBEE),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade300),
+                        ),
+                        child: const Text(
+                          'Wipe remoto ejecutado. Datos eliminados.',
+                          style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14),
+                        ),
+                      ),
+                    ],
+
+                    const Text(
+                      'Almacenamiento seguro',
+                      style: TextStyle(
+                          color: textColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Informacion cifrada en el dispositivo',
+                      style: TextStyle(color: subtitleColor, fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+
+                    _buildSecureField(Icons.email_outlined, 'Correo electronico', _email),
+                    _buildSecureField(Icons.lock_outline, 'Contrasena', _password),
+                    _buildSecureField(Icons.credit_card_outlined, 'Numero de tarjeta', _cardNumber),
+                    _buildSecureField(Icons.pin_outlined, 'PIN', _pin),
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _autoFillData,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text(
+                          'Llenar datos automaticamente',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+                    const Divider(color: borderColor),
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'Token FCM',
+                      style: TextStyle(
+                          color: textColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Usalo en Firebase Console para enviar el wipe remoto.',
+                      style: TextStyle(color: subtitleColor, fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () {
+                        if (_fcmToken != null) {
+                          Clipboard.setData(ClipboardData(text: _fcmToken!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Token copiado al portapapeles')),
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _fcmToken ?? 'Cargando token...',
+                              style: const TextStyle(
+                                  color: textColor,
+                                  fontSize: 11,
+                                  fontFamily: 'monospace'),
+                            ),
+                            if (_fcmToken != null) ...[
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Toca para copiar',
+                                style: TextStyle(
+                                    color: primaryColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Palabra clave del wipe remoto',
+                            style: TextStyle(
+                                color: subtitleColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'tilines',
+                            style: TextStyle(
+                                color: primaryColor,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace'),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Enviar en el campo "action" del payload FCM',
+                            style: TextStyle(color: subtitleColor, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSecureField(IconData icon, String label, String? value) {
+    const primaryColor = Color(0xFF9C27B0);
+    const textColor = Color(0xFF2D3142);
+    const subtitleColor = Color(0xFF9094A6);
+    const borderColor = Color(0xFFE0E0E0);
+    final hasValue = value != null && value.isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: hasValue ? primaryColor : subtitleColor, size: 20),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                      color: subtitleColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  hasValue ? value : 'Sin datos',
+                  style: TextStyle(
+                      color: hasValue ? textColor : subtitleColor,
+                      fontSize: 14,
+                      fontStyle: hasValue ? FontStyle.normal : FontStyle.italic),
+                ),
+              ],
+            ),
           ),
-        ),
+          Icon(
+            hasValue ? Icons.check_circle_outline : Icons.circle_outlined,
+            color: hasValue ? Colors.green : borderColor,
+            size: 18,
+          ),
+        ],
       ),
     );
   }
