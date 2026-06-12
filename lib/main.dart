@@ -6,7 +6,7 @@ import 'package:safe_device/safe_device.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
+import 'package:flutter/foundation.dart';
 void main() {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -46,6 +46,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoading = true;
   bool _isMockLocationDetected = false;
 
+  bool _isUsbDebuggingDetected = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +57,23 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _verificarSeguridadDispositivo() async {
     try {
+      ////////// se ejecuta cuando no esta en modo debug en flutter
+      if (!kDebugMode) {
+        try {
+          // safe_device lee las APIs nativas de Android buscando Settings.Global.ADB_ENABLED
+          bool isAdbEnabled = await SafeDevice.isDevelopmentModeEnabled;
+          if (isAdbEnabled) {
+            setState(() {
+              _isUsbDebuggingDetected = true;
+              _isLoading = false;
+            });
+            return; // Detenemos la ejecución inmediata del resto de validaciones
+          }
+        } catch (_) {}
+      }
+      /////////
+
+
       // Pedimos permiso de ubicación al usuario
       PermissionStatus status = await Permission.location.request();
       
@@ -118,6 +137,77 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
     }
+
+    ////////////////////////////// Bloqueo por depuración USB detectada 
+    if (_isUsbDebuggingDetected) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.adb, // Icono representativo de Android / ADB Bug
+                  color: Colors.amber,
+                  size: 90,
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'Entorno Inseguro Detectado',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D3142),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'Se ha detectado que la "Depuración USB" (USB Debugging) está activa en este dispositivo.\n\nPor políticas de ciberseguridad y para evitar ataques de ingeniería inversa o extracción de datos, debes desactivar esta opción en las "Opciones de Desarrollador" de tu teléfono para poder usar la aplicación.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF9094A6),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Cierre limpio y seguro de la aplicación solicitado por la práctica
+                      SystemNavigator.pop(); 
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2D3142),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'CERRAR APLICACIÓN',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    ///
 
     if (_isMockLocationDetected) {
       return Scaffold(
@@ -388,6 +478,7 @@ class SecondPage extends StatefulWidget {
 class _SecondPageState extends State<SecondPage> {
   Timer? _inactivityTimer;
   final _storage = const FlutterSecureStorage();
+  // tiempo inactividad
   final int _timeoutSeconds = 10; // 10 segundos de inactividad para pruebas
 
   @override
