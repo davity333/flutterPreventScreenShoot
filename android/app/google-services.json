@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88687453297",
+    "project_id": "learnex-d6d0b",
+    "storage_bucket": "learnex-d6d0b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88687453297:android:7d9e6da5d7dacff1fde7d0",
+        "android_client_info": {
+          "package_name": "com.example.login_no_screenhot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCggHurf_emexBZYS3YiKVa1EHmNZewUPA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
